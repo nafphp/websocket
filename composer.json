@@ -1,0 +1,37 @@
+{
+    "name": "naf/websocket",
+    "description": "A WebSocket server for NAF hosts, in plain PHP: it carries that something changed, never what.",
+    "type": "naf-plugin",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.3",
+        "naf/framework": "^0.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Naf\\Websocket\\": "src/"
+        },
+        "files": [
+            "src/functions.php"
+        ]
+    },
+    "scripts": {
+        "test": "@php vendor/bin/phpunit --colors=always",
+        "style:check": "@php vendor/bin/php-cs-fixer fix --dry-run --diff",
+        "style:fix": "@php vendor/bin/php-cs-fixer fix"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "3.95.25",
+        "phpunit/phpunit": "^12.1"
+    },
+    "config": {
+        "platform": {
+            "php": "8.3.0"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    }
+}
