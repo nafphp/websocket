@@ -148,6 +148,40 @@ final class ServerTest extends TestCase
         $this->assertSame(Frame::CLOSE, $frame?->opcode);
     }
 
+    public function testAConnectionBeyondTheLimitIsRefusedRatherThanAccepted(): void
+    {
+        $port    = random_int(20000, 45000);
+        $control = sys_get_temp_dir() . '/naf-websocket-limit-' . $port . '.sock';
+        $server  = new Server('127.0.0.1:' . $port, $control, self::KEY, [], null, static fn() => null, 1);
+        $server->listen();
+
+        $first  = $this->dial('127.0.0.1:' . $port);
+        $second = $this->dial('127.0.0.1:' . $port);
+        for ($i = 0; $i < 6; $i++) {
+            $server->turn(0.02);
+            usleep(2000);
+        }
+
+        $this->assertStringContainsString('503', (string) fread($second, 512));
+
+        fclose($first);
+        fclose($second);
+        $server->stop();
+        @unlink($control);
+    }
+
+    /** @return resource */
+    private function dial(string $address): mixed
+    {
+        $stream = stream_socket_client('tcp://' . $address, $code, $error, 2);
+        $this->assertNotFalse($stream, "keine Verbindung: $error");
+        stream_set_blocking($stream, false);
+        fwrite($stream, "GET / HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+            . "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n");
+
+        return $stream;
+    }
+
     private function connect(string $ticket): Peer
     {
         $stream = stream_socket_client('tcp://' . $this->address, $code, $error, 2);

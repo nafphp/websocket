@@ -36,6 +36,16 @@ final class ServeCommand extends AbstractCommand
 
     public function run(Input $input, Output $output): int
     {
+        if (config('websocket:enabled', false) !== true) {
+            $output->writeLine(
+                'websocket:enabled steht auf false. Der Server startet nicht, und die Anwendung '
+                . 'sagt keinem Browser, wo er sich verbinden soll.',
+                'warning',
+            );
+
+            return self::SUCCESS;
+        }
+
         $key = (string) config('websocket:key', '');
         if ($key === '') {
             $output->writeLine(
@@ -68,6 +78,7 @@ final class ServeCommand extends AbstractCommand
             array_values((array) config('websocket:origins', [])),
             $tls,
             static fn(string $line) => $output->writeLine($line),
+            (int) config('websocket:max_connections', 2000),
         );
 
         $server->listen();

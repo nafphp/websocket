@@ -6,6 +6,7 @@ namespace Naf\Websocket\Server;
 
 use Naf\Websocket\Protocol\Close;
 use Naf\Websocket\Protocol\Frame;
+use Naf\Websocket\Protocol\Handshake;
 use Naf\Websocket\Ticket;
 use RuntimeException;
 
@@ -49,6 +50,7 @@ final class Server
         private readonly array $origins,
         private readonly ?array $tls = null,
         private $log = null,
+        private readonly int $limit = 2000,
     ) {
         $this->hub = new Hub();
         $this->log ??= static fn(string $line) => fwrite(STDOUT, $line . "\n");
@@ -176,6 +178,19 @@ final class Server
         if ($stream === false) {
             return;
         }
+
+        /*
+         * Refused rather than accepted and then dropped: a connection this
+         * process cannot afford should learn that from the server, not from the
+         * kernel running it out of descriptors.
+         */
+        if ($this->hub->count() >= $this->limit) {
+            @fwrite($stream, Handshake::refuse('503 Service Unavailable'));
+            @fclose($stream);
+
+            return;
+        }
+
         stream_set_blocking($stream, false);
 
         $connection = new Connection($stream, (string) ++$this->sequence, $this->tls !== null);
