@@ -22,6 +22,12 @@ listen to a channel, so it does not: the application answers that while it still
 has a request and writes the answer into a short-lived signed token. A
 connection may join what its token names, and nothing else.
 
+Short-lived means a reconnect needs a new one, so the client asks the host for it
+-- over HTTP, where a session still exists. The host decides what that costs it:
+somebody who has been signed out or removed from a board is simply not given
+another token, and the client stops asking. `Naf\Websocket\token()` issues them;
+where to ask is in the page, because only the host knows its own routes.
+
 ## Running it
 
     php vendor/bin/naf websocket:serve

@@ -6,10 +6,13 @@
  * application's ordinary path -- which is why nothing here has to be trusted
  * with what a card looks like or who may see one.
  *
- * Everything it needs is in the page: where to connect and a token that names
- * the channels. Without either, this module does nothing at all, which is what
- * an installation with the server switched off should get.
+ * Everything it needs to start is in the page: where to connect, a token that
+ * names the channels, and where to ask for the next one. Without the first two,
+ * this module does nothing at all, which is what an installation with the server
+ * switched off should get.
  */
+import { renew, RETRY, STOP } from './token.js';
+
 const settings = document.querySelector('script[data-naf-websocket]');
 const config = settings ? JSON.parse(settings.textContent || '{}') : null;
 
@@ -21,14 +24,57 @@ let attempt = 0;
 let timer = null;
 let closed = false;
 
+/*
+ * Used once and then thrown away. The token in the page opens the first
+ * connection; every attempt after that asks for its own, because the rendered
+ * one is the first thing about a page to expire -- and asking is also how a
+ * client finds out it no longer may.
+ */
+let credentials = config?.url && config?.token ? { url: config.url, token: config.token } : null;
+
 function announce(name, detail) {
   document.dispatchEvent(new CustomEvent(name, { detail }));
 }
 
-function connect() {
-  if (closed || !config?.url || !config?.token) return;
+/** Done for good: no delay is announced, because nothing is waiting any more. */
+function stop() {
+  closed = true;
+  announce('naf:websocket-closed', { retryIn: null });
+}
 
-  socket = new WebSocket(`${config.url}?token=${encodeURIComponent(config.token)}`);
+function later() {
+  const delay = DELAYS[Math.min(attempt++, DELAYS.length - 1)];
+  timer = setTimeout(connect, delay);
+  announce('naf:websocket-closed', { retryIn: delay });
+}
+
+async function connect() {
+  if (closed) return;
+
+  if (credentials === null) {
+    if (!config?.refresh) {
+      stop();
+
+      return;
+    }
+
+    const answer = await renew(config.refresh);
+    // Asking took a moment, and a page can be left during it.
+    if (closed) return;
+    if (answer === STOP) {
+      stop();
+
+      return;
+    }
+    if (answer === RETRY) {
+      later();
+
+      return;
+    }
+    credentials = answer;
+  }
+
+  socket = new WebSocket(`${credentials.url}?token=${encodeURIComponent(credentials.token)}`);
 
   socket.addEventListener('open', () => {
     attempt = 0;
@@ -48,14 +94,10 @@ function connect() {
 
   socket.addEventListener('close', () => {
     socket = null;
+    // Whatever these were worth, they are spent: the next attempt asks.
+    credentials = null;
     if (closed) return;
-    // A token is short-lived, so a reconnect needs a fresh page-issued one.
-    // Reloading the page is not that; asking for one is, and that is the next
-    // piece. Until then a dropped connection stays dropped after its token
-    // has expired, and the application falls back to what it did before.
-    const delay = DELAYS[Math.min(attempt++, DELAYS.length - 1)];
-    timer = setTimeout(connect, delay);
-    announce('naf:websocket-closed', { retryIn: delay });
+    later();
   });
 
   socket.addEventListener('error', () => socket?.close());
@@ -68,7 +110,7 @@ addEventListener('pagehide', () => {
   socket?.close();
 });
 
-if (config?.url && config?.token) connect();
+if (credentials !== null) connect();
 
 export function live() {
   return socket?.readyState === WebSocket.OPEN;

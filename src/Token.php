@@ -36,7 +36,14 @@ final readonly class Token
     ) {
     }
 
-    /** @param list<string> $channels */
+    /**
+     * Issuing is a pure function of what goes in, so two tokens issued for the
+     * same subject and channels within the same second are the same string.
+     * Nothing rests on them differing; what renewal buys is a later expiry, not
+     * a new value.
+     *
+     * @param list<string> $channels
+     */
     public static function issue(
         string $key,
         string $subject,
