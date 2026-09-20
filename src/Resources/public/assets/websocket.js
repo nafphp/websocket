@@ -103,6 +103,27 @@ async function connect() {
   socket.addEventListener('error', () => socket?.close());
 }
 
+/*
+ * The one thing a page may say back.
+ *
+ * Everything above is one-way on purpose: the server says what changed and the
+ * page fetches it through the application, so nothing here has to be trusted.
+ * Presence is the exception the server makes -- where somebody is looking is a
+ * fact only their own browser has -- and this is the door it comes through.
+ *
+ * An event rather than an exported function, because that is already how this
+ * module talks: a page that wants to be told listens for `naf:websocket-open`,
+ * and a page that wants to speak dispatches this. Neither needs to know where
+ * the file lives, which for a package served under /plugins/ is worth keeping.
+ *
+ * Dropped when there is no connection, and that is the whole error handling:
+ * presence is a courtesy. The next thing said replaces what was missed.
+ */
+document.addEventListener('naf:websocket-say', (event) => {
+  if (socket?.readyState !== WebSocket.OPEN) return;
+  socket.send(JSON.stringify(event.detail ?? {}));
+});
+
 // A page being left should not keep retrying on the way out.
 addEventListener('pagehide', () => {
   closed = true;
