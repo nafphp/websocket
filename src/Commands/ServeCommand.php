@@ -36,10 +36,11 @@ final class ServeCommand extends AbstractCommand
 
     public function run(Input $input, Output $output): int
     {
-        if (config('websocket:enabled', false) !== true) {
+        if (!\Naf\Websocket\live()) {
             $output->writeLine(
-                'websocket:enabled steht auf false. Der Server startet nicht, und die Anwendung '
-                . 'sagt keinem Browser, wo er sich verbinden soll.',
+                'Aus: websocket:enabled steht nicht auf true, oder es gibt keinen Schlüssel. '
+                . 'Der Server startet nicht, und die Anwendung sagt keinem Browser, wo er sich '
+                . 'verbinden soll.',
                 'warning',
             );
 
