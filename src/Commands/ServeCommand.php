@@ -50,7 +50,7 @@ final class ServeCommand extends AbstractCommand
         $key = (string) config('websocket:key', '');
         if ($key === '') {
             $output->writeLine(
-                'Kein Schlüssel für Tickets. Ohne ihn kann der Server keine Verbindung prüfen; '
+                'Kein Schlüssel für Tokens. Ohne ihn kann der Server keine Verbindung prüfen; '
                 . 'setze websocket:key.',
                 'error',
             );

@@ -59,23 +59,23 @@ return ['websocket' => [
     'control' => '/tmp/naf-websocket.sock',
 
     /*
-     * What tickets are signed with.
+     * What tokens are signed with.
      *
      * The web process issues them and the server verifies them, so both read
-     * this, and it is the only thing between a forged ticket and a channel.
+     * this, and it is the only thing between a forged token and a channel.
      * There is deliberately no default: a key that ships with the package is a
      * key everybody has.
      */
     'key' => '',
 
     /*
-     * How long a ticket is worth something.
+     * How long a token is worth something.
      *
      * It rides in a query string, which is where browsers allow anything on an
      * upgrade request -- and query strings end up in logs. Long enough to
      * connect, short enough that a leaked one is worthless.
      */
-    'ticket_lifetime' => 60,
+    'token_lifetime' => 60,
 
     /*
      * How many connections the server will hold.

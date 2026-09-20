@@ -103,7 +103,7 @@ final readonly class Handshake
         return base64_encode(sha1($key . self::GUID, true));
     }
 
-    /** The query string of the upgrade request, which is where the ticket rides. */
+    /** The query string of the upgrade request, which is where the token rides. */
     public function query(string $name): ?string
     {
         $at = strpos($this->path, '?');

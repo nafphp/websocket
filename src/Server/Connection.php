@@ -6,7 +6,7 @@ namespace Naf\Websocket\Server;
 
 use Naf\Websocket\Protocol\Frame;
 use Naf\Websocket\Protocol\Handshake;
-use Naf\Websocket\Ticket;
+use Naf\Websocket\Token;
 
 /**
  * One client, and everything that is true of it between two turns of the loop.
@@ -23,8 +23,8 @@ final class Connection
     public const int OPEN        = 2;
     public const int CLOSING     = 3;
 
-    public int $state      = self::SECURING;
-    public ?Ticket $ticket = null;
+    public int $state    = self::SECURING;
+    public ?Token $token = null;
     public float $seen;
     private string $in  = '';
     private string $out = '';
@@ -210,9 +210,9 @@ final class Connection
         return $this->secure;
     }
 
-    public function accept(Handshake $request, Ticket $ticket): void
+    public function accept(Handshake $request, Token $token): void
     {
-        $this->ticket = $ticket;
+        $this->token = $token;
         $this->write($request->response());
         $this->state = self::OPEN;
     }

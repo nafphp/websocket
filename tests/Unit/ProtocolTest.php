@@ -29,11 +29,11 @@ final class ProtocolTest extends TestCase
 
     public function testAnUpgradeRequestIsRead(): void
     {
-        $request = Handshake::read($this->upgrade('/socket?ticket=abc'), $refusal);
+        $request = Handshake::read($this->upgrade('/socket?token=abc'), $refusal);
 
         $this->assertNull($refusal);
         $this->assertNotNull($request);
-        $this->assertSame('abc', $request->query('ticket'));
+        $this->assertSame('abc', $request->query('token'));
         $this->assertStringContainsString('101 Switching Protocols', $request->response());
     }
 
@@ -132,7 +132,7 @@ final class ProtocolTest extends TestCase
 
     public function testACloseFrameCarriesItsCode(): void
     {
-        $bytes = Frame::close(Close::POLICY, 'kein Ticket')->encode();
+        $bytes = Frame::close(Close::POLICY, 'kein Token')->encode();
         $frame = new Frame(Frame::CLOSE, substr($bytes, 2));
 
         $this->assertSame(Close::POLICY, unpack('n', substr($frame->payload, 0, 2))[1]);

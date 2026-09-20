@@ -7,7 +7,7 @@ namespace Naf\Websocket\Server;
 use Naf\Websocket\Protocol\Close;
 use Naf\Websocket\Protocol\Frame;
 use Naf\Websocket\Protocol\Handshake;
-use Naf\Websocket\Ticket;
+use Naf\Websocket\Token;
 use RuntimeException;
 
 /**
@@ -260,18 +260,18 @@ final class Server
             return;
         }
 
-        $ticket = Ticket::verify($this->key, $request->query('ticket') ?? '');
-        if ($ticket === null) {
+        $token = Token::verify($this->key, $request->query('token') ?? '');
+        if ($token === null) {
             $connection->refuse('401 Unauthorized');
 
             return;
         }
 
-        $connection->accept($request, $ticket);
-        foreach ($ticket->channels as $channel) {
+        $connection->accept($request, $token);
+        foreach ($token->channels as $channel) {
             $this->hub->join($connection, $channel);
         }
-        $connection->say(['type' => 'ready', 'channels' => $ticket->channels]);
+        $connection->say(['type' => 'ready', 'channels' => $token->channels]);
     }
 
     private function handle(Connection $connection, Frame $frame): void

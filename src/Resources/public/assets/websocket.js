@@ -6,7 +6,7 @@
  * application's ordinary path -- which is why nothing here has to be trusted
  * with what a card looks like or who may see one.
  *
- * Everything it needs is in the page: where to connect and a ticket that names
+ * Everything it needs is in the page: where to connect and a token that names
  * the channels. Without either, this module does nothing at all, which is what
  * an installation with the server switched off should get.
  */
@@ -26,9 +26,9 @@ function announce(name, detail) {
 }
 
 function connect() {
-  if (closed || !config?.url || !config?.ticket) return;
+  if (closed || !config?.url || !config?.token) return;
 
-  socket = new WebSocket(`${config.url}?ticket=${encodeURIComponent(config.ticket)}`);
+  socket = new WebSocket(`${config.url}?token=${encodeURIComponent(config.token)}`);
 
   socket.addEventListener('open', () => {
     attempt = 0;
@@ -49,9 +49,9 @@ function connect() {
   socket.addEventListener('close', () => {
     socket = null;
     if (closed) return;
-    // A ticket is short-lived, so a reconnect needs a fresh page-issued one.
+    // A token is short-lived, so a reconnect needs a fresh page-issued one.
     // Reloading the page is not that; asking for one is, and that is the next
-    // piece. Until then a dropped connection stays dropped after its ticket
+    // piece. Until then a dropped connection stays dropped after its token
     // has expired, and the application falls back to what it did before.
     const delay = DELAYS[Math.min(attempt++, DELAYS.length - 1)];
     timer = setTimeout(connect, delay);
@@ -68,7 +68,7 @@ addEventListener('pagehide', () => {
   socket?.close();
 });
 
-if (config?.url && config?.ticket) connect();
+if (config?.url && config?.token) connect();
 
 export function live() {
   return socket?.readyState === WebSocket.OPEN;

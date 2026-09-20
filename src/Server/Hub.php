@@ -7,7 +7,7 @@ namespace Naf\Websocket\Server;
 /**
  * Who is listening to what.
  *
- * A channel is a string the application chose and wrote into a ticket; this
+ * A channel is a string the application chose and wrote into a token; this
  * knows nothing about what one means. Fan-out is the only thing that happens
  * here, and it happens into a write buffer rather than onto a socket, so one
  * slow client cannot hold up the others.

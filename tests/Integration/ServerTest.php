@@ -8,7 +8,7 @@ use Naf\Websocket\Protocol\Frame;
 use Naf\Websocket\Protocol\Handshake;
 use Naf\Websocket\Publisher;
 use Naf\Websocket\Server\Server;
-use Naf\Websocket\Ticket;
+use Naf\Websocket\Token;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -54,9 +54,9 @@ final class ServerTest extends TestCase
         @unlink($this->control);
     }
 
-    public function testATicketedClientIsToldWhatItIsListeningTo(): void
+    public function testAnAuthorisedClientIsToldWhatItIsListeningTo(): void
     {
-        $client = $this->connect(Ticket::issue(self::KEY, '7', ['project:4']));
+        $client = $this->connect(Token::issue(self::KEY, '7', ['project:4']));
 
         $this->assertStringContainsString('101 Switching Protocols', $this->head($client));
 
@@ -67,8 +67,8 @@ final class ServerTest extends TestCase
 
     public function testAPublishedMessageReachesTheChannelAndNobodyElse(): void
     {
-        $listening = $this->connect(Ticket::issue(self::KEY, '7', ['project:4']));
-        $elsewhere = $this->connect(Ticket::issue(self::KEY, '8', ['project:9']));
+        $listening = $this->connect(Token::issue(self::KEY, '7', ['project:4']));
+        $elsewhere = $this->connect(Token::issue(self::KEY, '8', ['project:9']));
         $this->head($listening);
         $this->head($elsewhere);
         $this->message($listening);
@@ -85,31 +85,31 @@ final class ServerTest extends TestCase
         $this->assertNull($this->message($elsewhere, false), 'a channel leaked into another one');
     }
 
-    public function testAConnectionWithoutATicketIsRefused(): void
+    public function testAConnectionWithoutATokenIsRefused(): void
     {
         $client = $this->connect('');
 
         $this->assertStringContainsString('401', $this->head($client));
     }
 
-    public function testATicketForAnotherKeyIsRefused(): void
+    public function testATokenForAnotherKeyIsRefused(): void
     {
-        $client = $this->connect(Ticket::issue('ein anderer Schlüssel', '7', ['project:4']));
+        $client = $this->connect(Token::issue('ein anderer Schlüssel', '7', ['project:4']));
 
         $this->assertStringContainsString('401', $this->head($client));
     }
 
-    public function testAnExpiredTicketIsRefused(): void
+    public function testAnExpiredTokenIsRefused(): void
     {
-        $client = $this->connect(Ticket::issue(self::KEY, '7', ['project:4'], -1));
+        $client = $this->connect(Token::issue(self::KEY, '7', ['project:4'], -1));
 
         $this->assertStringContainsString('401', $this->head($client));
     }
 
-    /** The channels are in the ticket, so a client cannot ask for another one. */
-    public function testAMessageForAChannelTheTicketDoesNotNameNeverArrives(): void
+    /** The channels are in the token, so a client cannot ask for another one. */
+    public function testAMessageForAChannelTheTokenDoesNotNameNeverArrives(): void
     {
-        $client = $this->connect(Ticket::issue(self::KEY, '7', ['project:4']));
+        $client = $this->connect(Token::issue(self::KEY, '7', ['project:4']));
         $this->head($client);
         $this->message($client);
 
@@ -121,7 +121,7 @@ final class ServerTest extends TestCase
 
     public function testAClientThatSaysSomethingIsIgnoredRatherThanObeyed(): void
     {
-        $client = $this->connect(Ticket::issue(self::KEY, '7', ['project:4']));
+        $client = $this->connect(Token::issue(self::KEY, '7', ['project:4']));
         $this->head($client);
         $this->message($client);
 
@@ -136,7 +136,7 @@ final class ServerTest extends TestCase
 
     public function testAnOversizedFrameClosesTheConnection(): void
     {
-        $client = $this->connect(Ticket::issue(self::KEY, '7', ['project:4']));
+        $client = $this->connect(Token::issue(self::KEY, '7', ['project:4']));
         $this->head($client);
         $this->message($client);
 
@@ -182,7 +182,7 @@ final class ServerTest extends TestCase
         return $stream;
     }
 
-    private function connect(string $ticket): Peer
+    private function connect(string $token): Peer
     {
         $stream = stream_socket_client('tcp://' . $this->address, $code, $error, 2);
         $this->assertNotFalse($stream, "keine Verbindung: $error");
@@ -191,7 +191,7 @@ final class ServerTest extends TestCase
         $peer            = new Peer($stream);
         $this->clients[] = $peer;
 
-        fwrite($stream, "GET /?ticket=" . rawurlencode($ticket) . " HTTP/1.1\r\n"
+        fwrite($stream, "GET /?token=" . rawurlencode($token) . " HTTP/1.1\r\n"
             . "Host: 127.0.0.1\r\n"
             . "Upgrade: websocket\r\n"
             . "Connection: Upgrade\r\n"

@@ -19,8 +19,8 @@ installation that would rather proxy it still can.
 
 The server has no session and no database. It cannot ask whether somebody may
 listen to a channel, so it does not: the application answers that while it still
-has a request and writes the answer into a short-lived signed ticket. A
-connection may join what its ticket names, and nothing else.
+has a request and writes the answer into a short-lived signed token. A
+connection may join what its token names, and nothing else.
 
 ## Running it
 

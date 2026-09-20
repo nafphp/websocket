@@ -19,7 +19,7 @@ function publisher(): Publisher
 }
 
 /**
- * A ticket for these channels, for the browser that is being served right now.
+ * A token for these channels, for the browser that is being served right now.
  *
  * Called while there is still a request, which is the only moment the answer to
  * "may this person hear this" is cheap to get. What comes back is a string to
@@ -27,14 +27,14 @@ function publisher(): Publisher
  *
  * @param list<string> $channels
  */
-function ticket(string $subject, array $channels): string
+function token(string $subject, array $channels): string
 {
     $key = (string) config('websocket:key', '');
     if ($key === '') {
         return '';
     }
 
-    return Ticket::issue($key, $subject, $channels, (int) config('websocket:ticket_lifetime', 60));
+    return Token::issue($key, $subject, $channels, (int) config('websocket:token_lifetime', 60));
 }
 
 /**
