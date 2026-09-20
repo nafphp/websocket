@@ -28,6 +28,20 @@ use RuntimeException;
 final class Server
 {
     /** How long between pings, and how long silence may last before a drop. */
+    /**
+     * The one prefix this server reads a meaning into.
+     *
+     * Everywhere else a channel is an opaque string and the server is proud of
+     * it. Here it has to know, because presence is the one thing the
+     * application cannot tell it: who is connected is a fact only the server
+     * holds.
+     */
+    public const string PRESENCE = 'presence:';
+
+    /** As much as a client may say at once, and as long as a location may be. */
+    private const int SPOKEN   = 512;
+    private const int LOCATION = 64;
+
     private const float HEARTBEAT = 25.0;
     private const float SILENCE   = 70.0;
 
@@ -272,6 +286,67 @@ final class Server
             $this->hub->join($connection, $channel);
         }
         $connection->say(['type' => 'ready', 'channels' => $token->channels]);
+        $this->announce($connection);
+    }
+
+    /**
+     * Who is here, on the channels that are about that.
+     *
+     * A channel whose name begins `presence:` is one the server knows something
+     * about, which is otherwise never true -- everywhere else a channel is an
+     * opaque string the application chose. The exception buys a great deal: the
+     * server already knows who is connected and to what, so presence needs no
+     * heartbeat from the page, no endpoint to poll, and nothing stored anywhere.
+     *
+     * The newcomer is told who is already there; the others are told about the
+     * newcomer. The subject comes from the token, so nobody can announce
+     * themselves as somebody else.
+     */
+    private function announce(Connection $connection): void
+    {
+        $subject = $connection->token?->subject;
+        if ($subject === null || $subject === '') {
+            return;
+        }
+
+        foreach ($connection->token?->channels ?? [] as $channel) {
+            if (!str_starts_with($channel, self::PRESENCE)) {
+                continue;
+            }
+
+            // The roster first, to the newcomer alone: everybody else already
+            // knows who is there.
+            $connection->say([
+                'channel' => $channel,
+                'type'    => 'presence.here',
+                'present' => $this->hub->subjects($channel),
+            ]);
+
+            // A second tab is not a second arrival.
+            if ($this->hub->holds($channel, $subject, $connection)) {
+                continue;
+            }
+
+            $this->hub->publish($channel, ['type' => 'presence.joined', 'subject' => $subject]);
+        }
+    }
+
+    /** The mirror of announce(), for a connection that is going away. */
+    private function farewell(Connection $connection): void
+    {
+        $subject = $connection->token?->subject;
+        if ($subject === null || $subject === '') {
+            return;
+        }
+
+        foreach ($connection->token?->channels ?? [] as $channel) {
+            // The last tab closing is the person leaving; an earlier one is not.
+            if (!str_starts_with($channel, self::PRESENCE) || $this->hub->holds($channel, $subject, $connection)) {
+                continue;
+            }
+
+            $this->hub->publish($channel, ['type' => 'presence.left', 'subject' => $subject]);
+        }
     }
 
     private function handle(Connection $connection, Frame $frame): void
@@ -280,10 +355,48 @@ final class Server
             Frame::PING  => $connection->send(Frame::pong($frame->payload)),
             Frame::PONG  => null,
             Frame::CLOSE => $connection->closeWith(Close::NORMAL),
-            // Nothing a client says is acted on. The channels it may hear were
-            // decided before it connected, and there is nothing else to ask for.
-            default => null,
+            Frame::TEXT  => $this->relay($connection, $frame->payload),
+            default      => null,
         };
+    }
+
+    /**
+     * The one thing a client may say, and the one place it may say it.
+     *
+     * Everywhere else in this server, nothing a client sends is acted on: what
+     * it may hear was decided before it connected. Presence is the exception it
+     * has to be -- where somebody is looking is a fact only their browser has,
+     * and no amount of server-side knowledge produces it.
+     *
+     * What that buys a liar is nothing worth having. The subject is taken from
+     * the token and never from the message, so nobody can speak as somebody
+     * else. It reaches only presence channels this connection already holds a
+     * token for -- people who share that board, and who can see each other
+     * anyway. It is capped, and it is not stored: the next thing said replaces
+     * it, and a closed socket ends it.
+     */
+    private function relay(Connection $connection, string $payload): void
+    {
+        $subject = $connection->token?->subject;
+        if ($subject === null || $subject === '' || strlen($payload) > self::SPOKEN) {
+            return;
+        }
+
+        $said = json_decode($payload, true);
+        $at   = is_array($said) ? ($said['at'] ?? null) : null;
+        if (!is_string($at) || mb_strlen($at) > self::LOCATION) {
+            return;
+        }
+
+        foreach ($connection->token?->channels ?? [] as $channel) {
+            if (str_starts_with($channel, self::PRESENCE)) {
+                $this->hub->publish($channel, [
+                    'type'    => 'presence.at',
+                    'subject' => $subject,
+                    'at'      => $at,
+                ]);
+            }
+        }
     }
 
     /** One JSON object per line from the application, then the socket closes. */
@@ -322,6 +435,9 @@ final class Server
 
     private function part(Connection $connection): void
     {
+        // Said while it is still on the channel, so "is anybody else this
+        // person" has the connection that is leaving to exclude.
+        $this->farewell($connection);
         $this->hub->drop($connection);
         $connection->shutdown();
     }

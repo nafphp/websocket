@@ -182,6 +182,108 @@ final class ServerTest extends TestCase
         return $stream;
     }
 
+    /**
+     * Who is here, without anybody having to say so.
+     *
+     * The server already knows which connections it holds and to what, so
+     * presence costs no heartbeat from the page and nothing stored anywhere.
+     */
+    public function testAPresenceChannelTellsEachArrivalWhoIsAlreadyThere(): void
+    {
+        $first = $this->connect(Token::issue(self::KEY, '7', ['presence:project:4']));
+        $this->drain($first);
+
+        $second = $this->connect(Token::issue(self::KEY, '8', ['presence:project:4']));
+
+        $roster = $this->firstOfType($second, 'presence.here');
+        $this->assertNotNull($roster, 'the newcomer was not told who was there');
+        // Strings, not numbers: a client compares this with its own id.
+        $this->assertSame(['7', '8'], $roster['present']);
+
+        $joined = $this->firstOfType($first, 'presence.joined');
+        $this->assertNotNull($joined, 'nobody was told about the newcomer');
+        $this->assertSame('8', $joined['subject']);
+    }
+
+    /** A second tab is not a second person, and closing it is not leaving. */
+    public function testASecondConnectionOfTheSamePersonIsNotASecondArrival(): void
+    {
+        $first = $this->connect(Token::issue(self::KEY, '7', ['presence:project:4']));
+        $other = $this->connect(Token::issue(self::KEY, '8', ['presence:project:4']));
+        $this->drain($first);
+        $this->drain($other);
+
+        $again = $this->connect(Token::issue(self::KEY, '7', ['presence:project:4']));
+        $this->drain($again);
+
+        $this->assertNull(
+            $this->firstOfType($other, 'presence.joined'),
+            'the same person arriving twice was announced twice',
+        );
+    }
+
+    /**
+     * Where somebody is looking is the one thing only their browser knows, so it
+     * is the one thing a client may say. The subject comes from the token
+     * regardless of what the message claims.
+     */
+    public function testAClientMaySayWhereItIsAndNotWhoItIs(): void
+    {
+        $watcher = $this->connect(Token::issue(self::KEY, '7', ['presence:project:4']));
+        $other   = $this->connect(Token::issue(self::KEY, '8', ['presence:project:4']));
+        $this->drain($watcher);
+        $this->drain($other);
+
+        $other->write($this->maskedText(json_encode(['at' => 'NAF-12', 'subject' => '1'], JSON_THROW_ON_ERROR)));
+        $this->spin(6);
+
+        $said = $this->firstOfType($watcher, 'presence.at');
+        $this->assertNotNull($said, 'nothing was relayed');
+        $this->assertSame('NAF-12', $said['at']);
+        $this->assertSame('8', $said['subject'], 'a client announced itself as somebody else');
+    }
+
+    /** Anything longer than a location is not one. */
+    public function testAnOversizedLocationIsIgnored(): void
+    {
+        $watcher = $this->connect(Token::issue(self::KEY, '7', ['presence:project:4']));
+        $other   = $this->connect(Token::issue(self::KEY, '8', ['presence:project:4']));
+        $this->drain($watcher);
+        $this->drain($other);
+
+        $other->write($this->maskedText(json_encode(['at' => str_repeat('x', 200)], JSON_THROW_ON_ERROR)));
+        $this->spin(6);
+
+        $this->assertNull($this->firstOfType($watcher, 'presence.at'));
+    }
+
+    /** Everything waiting for this peer, thrown away -- the handshake included. */
+    private function drain(Peer $peer): void
+    {
+        $this->spin(4);
+        $peer->head();
+        while ($peer->frame() !== null) {
+            // nichts; es geht nur darum, den Puffer zu leeren
+        }
+    }
+
+    /** @return array<string,mixed>|null the first message of that type, if one came */
+    private function firstOfType(Peer $peer, string $type): ?array
+    {
+        $this->spin(4);
+        // The upgrade response sits in front of the frames until it is taken out.
+        $peer->head();
+
+        while (null !== $frame = $peer->frame()) {
+            $message = json_decode($frame->payload, true);
+            if (is_array($message) && ($message['type'] ?? null) === $type) {
+                return $message;
+            }
+        }
+
+        return null;
+    }
+
     private function connect(string $token): Peer
     {
         $stream = stream_socket_client('tcp://' . $this->address, $code, $error, 2);
