@@ -49,7 +49,7 @@ final class Hub
     {
         $sent = 0;
         foreach ($this->channels[$channel] ?? [] as $connection) {
-            if ($connection->state !== Connection::OPEN) {
+            if ($connection->state !== Connection::OPEN || $connection->expired()) {
                 continue;
             }
             $connection->say(['channel' => $channel] + $message);

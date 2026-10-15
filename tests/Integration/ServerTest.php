@@ -92,6 +92,28 @@ final class ServerTest extends TestCase
         $this->assertStringContainsString('401', $this->head($client));
     }
 
+    public function testExpiryEndsAnExistingSubscriptionBeforeAnotherPublication(): void
+    {
+        $token   = Token::issue(self::KEY, '7', ['project:4'], 2);
+        $expires = Token::verify(self::KEY, $token)->expires;
+        $client  = $this->connect($token);
+        $this->drain($client);
+
+        while (time() < $expires) {
+            usleep(20000);
+        }
+
+        self::assertTrue((new Publisher($this->control))->publish('project:4', ['revision' => 'expired']));
+        $this->spin(6);
+
+        self::assertSame(0, $this->server->hub()->count());
+        self::assertNull($client->frame(), 'An expired subscription received a publication.');
+
+        $renewed = $this->connect(Token::issue(self::KEY, '7', ['project:4']));
+        self::assertStringContainsString('101 Switching Protocols', $this->head($renewed));
+        self::assertSame('ready', $this->message($renewed)['type']);
+    }
+
     public function testATokenForAnotherKeyIsRefused(): void
     {
         $client = $this->connect(Token::issue('ein anderer Schlüssel', '7', ['project:4']));

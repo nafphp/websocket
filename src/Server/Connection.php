@@ -159,6 +159,11 @@ final class Connection
         return $this->out !== '';
     }
 
+    public function expired(): bool
+    {
+        return $this->token !== null && $this->token->expires <= time();
+    }
+
     /**
      * Push out what fits, keep the rest.
      *
