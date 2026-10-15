@@ -44,6 +44,8 @@ $token = token((string) $userId, ['project:4']);
 A connection may join what its token names and nothing else. Tokens are short-lived on
 purpose: a reconnect needs a new one, the client asks the host over HTTP where a session
 exists, and somebody who has been signed out or removed is simply not given another.
+Expiry also ends established subscriptions before further publication, relay or buffer flush.
+The browser then renews through its existing authorized reconnect path.
 
 `Token::issue()` is a pure function of subject, channels and the current second — two calls in
 the same second return the same string, which is a property to rely on rather than a bug to

@@ -92,7 +92,7 @@ final readonly class Token
         ) {
             return null;
         }
-        if ($claims['e'] < ($now ?? time())) {
+        if ($claims['e'] <= ($now ?? time())) {
             return null;
         }
 

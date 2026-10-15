@@ -155,6 +155,14 @@ final class Server
             return;
         }
 
+        // Expiry applies to subscriptions as well as the upgrade. Check after
+        // waiting, before handling a publisher or flushing any queued payload.
+        foreach ($this->hub->all() as $connection) {
+            if ($connection->expired()) {
+                $this->part($connection);
+            }
+        }
+
         foreach ($read as $handle) {
             if ($handle === $this->listener) {
                 $this->admit();
@@ -173,6 +181,11 @@ final class Server
             }
         }
         foreach ($this->hub->all() as $connection) {
+            if ($connection->expired()) {
+                $this->part($connection);
+
+                continue;
+            }
             if (!$connection->pending()) {
                 if ($connection->state === Connection::CLOSING) {
                     $this->part($connection);
@@ -378,7 +391,7 @@ final class Server
     private function relay(Connection $connection, string $payload): void
     {
         $subject = $connection->token?->subject;
-        if ($subject === null || $subject === '' || strlen($payload) > self::SPOKEN) {
+        if ($connection->expired() || $subject === null || $subject === '' || strlen($payload) > self::SPOKEN) {
             return;
         }
 

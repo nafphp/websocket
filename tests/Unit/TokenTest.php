@@ -58,8 +58,10 @@ final class TokenTest extends TestCase
     {
         $token = Token::issue(self::KEY, '7', ['project:4'], 60);
 
-        $this->assertNotNull(Token::verify(self::KEY, $token, time() + 59));
-        $this->assertNull(Token::verify(self::KEY, $token, time() + 61));
+        $expires = Token::verify(self::KEY, $token)->expires;
+        $this->assertNotNull(Token::verify(self::KEY, $token, $expires - 1));
+        $this->assertNull(Token::verify(self::KEY, $token, $expires));
+        $this->assertNull(Token::verify(self::KEY, $token, $expires + 1));
     }
 
     /** Nothing shaped wrong may reach the JSON decoder as if it were a token. */
